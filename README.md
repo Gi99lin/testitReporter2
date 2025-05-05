@@ -10,6 +10,9 @@ TestIT Reports is a web application that collects and displays statistics from t
 - **Statistics Visualization**: View statistics for test cases and test runs by user and date
 - **API Integration**: Seamless integration with TestIT API
 - **Authentication**: Secure JWT-based authentication
+- **Test Point Tracking**: Detailed tracking of individual test point results for accurate statistics
+- **Duplicate Prevention**: Improved logic to prevent duplicate statistics when collecting data multiple times
+- **Historical Data**: Maintain historical data for all test executions for comprehensive reporting
 
 ## Architecture
 
@@ -39,6 +42,7 @@ TestIT Reports is a web application that collects and displays statistics from t
 - **User-Project Relationships**: Track which users have access to which projects
 - **Test Case Statistics**: Store statistics about test case creation and modification
 - **Test Run Statistics**: Store statistics about test execution results
+- **Test Point Results**: Store detailed information about individual test point executions
 - **Global Settings**: Store application-wide settings
 
 ## API Endpoints
@@ -196,6 +200,28 @@ frontend/
     ├── services/     # API services
     └── utils/        # Utility functions
 ```
+
+## Recent Improvements
+
+### Test Point Results Tracking
+
+The application now tracks individual test point results in a dedicated table, providing more accurate and detailed statistics. This allows for:
+
+- Precise counting of passed and failed tests
+- Prevention of duplicate statistics when collecting data multiple times
+- Better historical data for comprehensive reporting
+
+### Statistics Calculation Improvements
+
+- Statistics are now calculated directly from the test point results table
+- Test point statuses are always updated when collecting statistics, ensuring the most recent data is used
+- Improved handling of project deletion with proper cleanup of related data
+
+### User Interface Enhancements
+
+- More accurate statistics display on project dashboards
+- Better handling of date ranges for statistics filtering
+- Improved performance for statistics calculations
 
 ## License
 
