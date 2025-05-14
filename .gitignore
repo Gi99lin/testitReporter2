@@ -57,5 +57,6 @@ yarn-error.log
 frontend/build/
 frontend/.cache/
 frontend/node_modules/.cache/
+frontend/node_modules/.cache/**/*.pack
 .cache/
 dist/
