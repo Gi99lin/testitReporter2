@@ -60,3 +60,4 @@ frontend/node_modules/.cache/
 frontend/node_modules/.cache/**/*.pack
 .cache/
 dist/
+frontend/node_modules/.cache/
