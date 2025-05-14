@@ -4,6 +4,8 @@ import com.testit.reports.controller.dto.ApiResponse;
 import com.testit.reports.controller.dto.GlobalSettingDto;
 import com.testit.reports.model.entity.GlobalSetting;
 import com.testit.reports.service.GlobalSettingService;
+import com.testit.reports.service.TestPointResultService;
+import com.testit.reports.service.TestRunStatisticsService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,8 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final GlobalSettingService globalSettingService;
+    private final TestRunStatisticsService testRunStatisticsService;
+    private final TestPointResultService testPointResultService;
 
     /**
      * Get all global settings
@@ -211,6 +215,37 @@ public class AdminController {
                     GlobalSettingDto.fromEntity(setting)));
         } catch (Exception e) {
             log.error("Error toggling TestIT cookies", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+    
+    /**
+     * Update usernames for all statistics records
+     *
+     * @return Success response
+     */
+    @PostMapping("/update-usernames")
+    public ResponseEntity<ApiResponse<Void>> updateAllUsernames() {
+        try {
+            log.info("Starting username update for all statistics records");
+            
+            // Get global token
+            String token = globalSettingService.getGlobalTestItToken();
+            if (token == null || token.isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("Global TestIT token is not set"));
+            }
+            
+            // Update usernames in test run statistics
+            testRunStatisticsService.updateAllUsernames(token);
+            
+            // Update usernames in test point results
+            testPointResultService.updateAllUsernames(token);
+            
+            log.info("Username update completed for all statistics records");
+            
+            return ResponseEntity.ok(ApiResponse.success("Username update completed for all statistics records"));
+        } catch (Exception e) {
+            log.error("Error updating usernames", e);
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }

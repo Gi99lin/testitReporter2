@@ -6,6 +6,7 @@ import com.testit.reports.model.entity.Project;
 import com.testit.reports.model.entity.TestCaseStatistics;
 import com.testit.reports.model.entity.TestRunStatistics;
 import com.testit.reports.model.entity.User;
+import com.testit.reports.client.testit.TestItApiClient;
 import com.testit.reports.service.ProjectService;
 import com.testit.reports.service.SchedulerService;
 import com.testit.reports.service.StatisticsService;
@@ -34,6 +35,7 @@ public class StatisticsController {
     private final UserService userService;
     private final SchedulerService schedulerService;
     private final TestPointResultService testPointResultService;
+    private final TestItApiClient testItApiClient;
 
     /**
      * Get statistics for a project
@@ -155,6 +157,27 @@ public class StatisticsController {
                 dailyStats.setFailedCount(failedCount);
             }
 
+            // Get user's TestIT token for API calls
+            String token = user.getTestitToken();
+            
+            // Update usernames with real names from TestIT API
+            if (token != null && !token.isEmpty()) {
+                log.info("Updating usernames with real names from TestIT API");
+                for (StatisticsDto.UserStatistics userStats : userStatisticsMap.values()) {
+                    try {
+                        UUID userId = userStats.getUserId();
+                        String realUsername = testItApiClient.getUserName(token, userId);
+                        log.info("Updated username for user {}: {} -> {}", userId, userStats.getUsername(), realUsername);
+                        userStats.setUsername(realUsername);
+                    } catch (Exception e) {
+                        log.warn("Failed to get real username for user {}: {}", userStats.getUserId(), e.getMessage());
+                        // Keep existing username if API call fails
+                    }
+                }
+            } else {
+                log.warn("TestIT token is not set for user {}, using stored usernames", user.getUsername());
+            }
+            
             // Build response
             StatisticsDto statisticsDto = StatisticsDto.builder()
                     .projectId(projectId)

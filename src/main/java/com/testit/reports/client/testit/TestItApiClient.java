@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -24,6 +25,9 @@ public class TestItApiClient {
     private final WebClient testItWebClient;
     private final GlobalSettingService globalSettingService;
     private final ObjectMapper objectMapper;
+    
+    // Cache for user names to avoid repeated API calls
+    private final Map<UUID, TestItUserDto> userCache = new ConcurrentHashMap<>();
     
     /**
      * Add headers to the request
@@ -295,6 +299,86 @@ public class TestItApiClient {
             log.error("Error getting test plans: {}", e.getMessage(), e);
             throw e;
         }
+    }
+    
+    /**
+     * Get user by ID
+     *
+     * @param token  The authentication token
+     * @param userId The user ID
+     * @return The user
+     */
+    public Mono<TestItUserDto> getUser(String token, UUID userId) {
+        log.info("Getting user by ID: {}", userId);
+        
+        // Check cache first
+        TestItUserDto cachedUser = userCache.get(userId);
+        if (cachedUser != null) {
+            log.info("User found in cache: {}", cachedUser.getUserName());
+            return Mono.just(cachedUser);
+        }
+        
+        // Create a custom WebClient for this request to use a different base URL without /v2
+        String baseUrl = globalSettingService.getApiBaseUrl();
+        // Remove /v2 from the base URL if present
+        if (baseUrl.endsWith("/v2")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 3);
+            log.info("Modified base URL for user API: {}", baseUrl);
+        }
+        
+        WebClient customWebClient = WebClient.builder()
+                .baseUrl(baseUrl)
+                .build();
+        
+        WebClient.RequestHeadersSpec<?> headersSpec = customWebClient.get()
+                .uri("/users/{userId}", userId);
+        
+        // Don't add "Bearer " prefix if token already has a prefix
+        String finalToken;
+        if (token.startsWith("OpenIdConnect") || token.startsWith("Bearer")) {
+            log.info("Token already has prefix, using as is");
+            finalToken = token;
+        } else {
+            log.info("Adding Bearer prefix to token");
+            finalToken = "Bearer " + token;
+        }
+        
+        addHeaders(headersSpec, finalToken);
+        
+        // Log the full curl command that can be used to reproduce the request
+        log.info("Equivalent curl command: curl -X GET '{}{}' -H 'Content-Type: application/json' -H 'Authorization: {}'",
+                globalSettingService.getApiBaseUrl(), 
+                "/users/" + userId, 
+                finalToken);
+        
+        return headersSpec.retrieve()
+                .bodyToMono(TestItUserDto.class)
+                .doOnSuccess(user -> {
+                    log.info("Received user: {}", user.getUserName());
+                    userCache.put(userId, user);
+                })
+                .doOnError(e -> log.error("Error getting user: {}", e.getMessage(), e));
+    }
+    
+    /**
+     * Get user name by ID
+     *
+     * @param token  The authentication token
+     * @param userId The user ID
+     * @return The user name or a default value if not found
+     */
+    public String getUserName(String token, UUID userId) {
+        try {
+            TestItUserDto user = getUser(token, userId).block();
+            if (user != null) {
+                return user.getUserName();
+            }
+        } catch (Exception e) {
+            log.error("Error getting user name: {}", e.getMessage(), e);
+        }
+        
+        // Fallback to default name
+        return "User " + userId.toString().substring(0, 8);
     }
     
     /**

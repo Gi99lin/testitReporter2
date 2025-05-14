@@ -28,6 +28,9 @@ public class TestRunStatisticsService {
     private final TestItApiClient testItApiClient;
     private final TestRunStatisticsRepository testRunStatisticsRepository;
     private final TestPointResultService testPointResultService;
+    
+    // Token used for API calls
+    private String currentToken;
 
     /**
      * Collect test run statistics for a project
@@ -41,6 +44,9 @@ public class TestRunStatisticsService {
     public void collectTestRunStatistics(Project project, String token, LocalDate startDate, LocalDate endDate) {
         log.info("Collecting test run statistics for project: {} (ID: {}, TestIT ID: {}), token: {}, startDate: {}, endDate: {}", 
                 project.getName(), project.getId(), project.getTestitId(), token, startDate, endDate);
+        
+        // Save token for use in other methods
+        this.currentToken = token;
         
         try {
             // Special handling for project with ID=3
@@ -274,7 +280,7 @@ public class TestRunStatisticsService {
             statusCounts.put(status, statusCounts.getOrDefault(status, 0) + 1);
             
             // Save individual test point result to the new table
-            testPointResultService.saveTestPointResult(project, testPlan.getId(), testPoint, userId, status, testPlanDate);
+            testPointResultService.saveTestPointResult(project, testPlan.getId(), testPoint, userId, status, testPlanDate, currentToken);
         }
         
         return pointsByUserAndStatus;
@@ -315,8 +321,16 @@ public class TestRunStatisticsService {
         statistics.setProject(project);
         statistics.setTestitUserId(userId);
         
-        // Find username from test points
-        String username = "User " + userId.toString().substring(0, 8);
+        // Get real username from TestIT API
+        String username;
+        try {
+            username = testItApiClient.getUserName(currentToken, userId);
+            log.info("Got real username from TestIT API: {}", username);
+        } catch (Exception e) {
+            // Fallback to default name if API call fails
+            username = "User " + userId.toString().substring(0, 8);
+            log.warn("Failed to get real username from TestIT API, using fallback: {}", username);
+        }
         statistics.setTestitUsername(username);
         
         statistics.setDate(testPlanDate);
@@ -367,5 +381,37 @@ public class TestRunStatisticsService {
     public int getTotalFailedCount(Long projectId, LocalDate startDate, LocalDate endDate) {
         Integer count = testRunStatisticsRepository.getTotalFailedCountByProjectAndDateRange(projectId, startDate, endDate);
         return count != null ? count : 0;
+    }
+    
+    /**
+     * Update usernames for all statistics records
+     *
+     * @param token TestIT API token
+     */
+    @Transactional
+    public void updateAllUsernames(String token) {
+        log.info("Updating usernames for all statistics records");
+        
+        // Get all statistics records
+        List<TestRunStatistics> allStatistics = testRunStatisticsRepository.findAll();
+        log.info("Found {} statistics records", allStatistics.size());
+        
+        // Update username for each record
+        for (TestRunStatistics statistics : allStatistics) {
+            UUID userId = statistics.getTestitUserId();
+            if (userId != null) {
+                try {
+                    String username = testItApiClient.getUserName(token, userId);
+                    log.info("Updating username for user {}: {} -> {}", 
+                            userId, statistics.getTestitUsername(), username);
+                    statistics.setTestitUsername(username);
+                    testRunStatisticsRepository.save(statistics);
+                } catch (Exception e) {
+                    log.error("Error updating username for user {}: {}", userId, e.getMessage(), e);
+                }
+            }
+        }
+        
+        log.info("Username update completed");
     }
 }

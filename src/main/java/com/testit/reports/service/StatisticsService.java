@@ -24,7 +24,6 @@ public class StatisticsService {
     private final ProjectService projectService;
     private final TestCaseStatisticsService testCaseStatisticsService;
     private final TestRunStatisticsService testRunStatisticsService;
-    private final TestPointResultService testPointResultService;
 
     /**
      * Collect statistics for a project

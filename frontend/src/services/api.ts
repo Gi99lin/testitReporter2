@@ -184,6 +184,9 @@ export const adminApi = {
   toggleUseTestItCookies: (use: boolean): Promise<AxiosResponse<ApiResponse<any>>> => {
     return api.put('/admin/settings/use-testit-cookies', use);
   },
+  updateAllUsernames: (): Promise<AxiosResponse<ApiResponse<any>>> => {
+    return api.post('/admin/update-usernames');
+  },
 };
 
 export default api;

@@ -1,5 +1,6 @@
 package com.testit.reports.service;
 
+import com.testit.reports.client.testit.TestItApiClient;
 import com.testit.reports.client.testit.dto.TestPointDto;
 import com.testit.reports.model.entity.Project;
 import com.testit.reports.model.entity.TestPointResult;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class TestPointResultService {
 
     private final TestPointResultRepository testPointResultRepository;
+    private final TestItApiClient testItApiClient;
 
     /**
      * Save test point result to the database
@@ -33,10 +35,11 @@ public class TestPointResultService {
      * @param userId     User ID
      * @param status     Status
      * @param date       Date
+     * @param token      TestIT API token (can be null)
      * @return Saved test point result or null if error
      */
     @Transactional
-    public TestPointResult saveTestPointResult(Project project, UUID testPlanId, TestPointDto testPoint, UUID userId, String status, LocalDate date) {
+    public TestPointResult saveTestPointResult(Project project, UUID testPlanId, TestPointDto testPoint, UUID userId, String status, LocalDate date, String token) {
         try {
             TestPointResult result;
             
@@ -58,7 +61,19 @@ public class TestPointResultService {
                 result.setTestPlanId(testPlanId);
                 result.setTestPointId(testPoint.getId());
                 result.setTestitUserId(userId);
-                result.setTestitUsername("User " + userId.toString().substring(0, 8));
+                
+                // Get real username from TestIT API
+                String username;
+                try {
+                    username = testItApiClient.getUserName(token, userId);
+                    log.info("Got real username from TestIT API: {}", username);
+                } catch (Exception e) {
+                    // Fallback to default name if API call fails
+                    username = "User " + userId.toString().substring(0, 8);
+                    log.warn("Failed to get real username from TestIT API, using fallback: {}", username);
+                }
+                result.setTestitUsername(username);
+                
                 result.setStatus(status);
                 result.setDate(date);
                 
@@ -155,5 +170,37 @@ public class TestPointResultService {
     public int countFailedTestPointsForUser(Long projectId, UUID userId, LocalDate startDate, LocalDate endDate) {
         Integer count = testPointResultRepository.countFailedByProjectIdAndUserIdAndDateBetween(projectId, userId, startDate, endDate);
         return count != null ? count : 0;
+    }
+    
+    /**
+     * Update usernames for all test point results
+     *
+     * @param token TestIT API token
+     */
+    @Transactional
+    public void updateAllUsernames(String token) {
+        log.info("Updating usernames for all test point results");
+        
+        // Get all test point results
+        List<TestPointResult> allResults = testPointResultRepository.findAll();
+        log.info("Found {} test point results", allResults.size());
+        
+        // Update username for each record
+        for (TestPointResult result : allResults) {
+            UUID userId = result.getTestitUserId();
+            if (userId != null) {
+                try {
+                    String username = testItApiClient.getUserName(token, userId);
+                    log.info("Updating username for user {}: {} -> {}", 
+                            userId, result.getTestitUsername(), username);
+                    result.setTestitUsername(username);
+                    testPointResultRepository.save(result);
+                } catch (Exception e) {
+                    log.error("Error updating username for user {}: {}", userId, e.getMessage(), e);
+                }
+            }
+        }
+        
+        log.info("Username update completed for test point results");
     }
 }

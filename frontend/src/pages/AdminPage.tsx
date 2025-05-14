@@ -94,6 +94,9 @@ const AdminPage: React.FC = () => {
   const [statsStartDate, setStatsStartDate] = useState<string>(format(new Date(new Date().setDate(1)), 'yyyy-MM-dd'));
   const [statsEndDate, setStatsEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
+  // Состояние для обновления имен пользователей
+  const [updatingUsernames, setUpdatingUsernames] = useState(false);
+  
   // Общее состояние
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -285,6 +288,19 @@ const AdminPage: React.FC = () => {
       setError(err.response?.data?.message || 'Не удалось запустить сбор статистики');
     } finally {
       setCollectingStats(false);
+    }
+  };
+  
+  // Функция для обновления имен пользователей
+  const handleUpdateAllUsernames = async () => {
+    try {
+      setUpdatingUsernames(true);
+      await adminApi.updateAllUsernames();
+      setSuccess('Обновление имен пользователей успешно запущено');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Не удалось запустить обновление имен пользователей');
+    } finally {
+      setUpdatingUsernames(false);
     }
   };
   
@@ -574,7 +590,7 @@ const AdminPage: React.FC = () => {
             Сбор статистики для всех проектов
           </Typography>
           
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="body1" paragraph>
               Запустите сбор статистики для всех проектов в системе. Это может занять некоторое время.
             </Typography>
@@ -615,6 +631,27 @@ const AdminPage: React.FC = () => {
                 </Button>
               </Grid>
             </Grid>
+          </Paper>
+          
+          <Typography variant="h6" gutterBottom>
+            Обновление имен пользователей
+          </Typography>
+          
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="body1" paragraph>
+              Обновите имена пользователей из TestIT для всех записей статистики. Это поможет отображать реальные имена пользователей вместо идентификаторов.
+            </Typography>
+            
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<RefreshIcon />}
+              onClick={handleUpdateAllUsernames}
+              disabled={updatingUsernames}
+              fullWidth
+            >
+              {updatingUsernames ? 'Обновление...' : 'Обновить имена пользователей'}
+            </Button>
           </Paper>
         </TabPanel>
       </Paper>
